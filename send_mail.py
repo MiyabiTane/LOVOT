@@ -1,16 +1,39 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# echo "本文" | mail -s "タイトル" -r from@example.com -c cc1@example.com -c cc2@example.com to1@example.com to2@example.com
+import smtplib
+from email.mime.text import MIMEText
+from email.utils import formatdate
+import ssl
 
-import subprocess
+FROM_ADDRESS = 'hoge@gmail.com'
+MY_PASSWORD = 'hogehoge'
+TO_ADDRESS = 'tanemoto@jsk.imi.i.u-tokyo.ac.jp'
+BCC = ''
+SUBJECT = 'GmailのSMTPサーバ経由'
+BODY = 'pythonでメール送信'
 
-# subprocess.call(["ls", "-l"])
-# subprocess.call(["echo" "main" "|" "mail" "-s" "title" "-r" "tanemoto.tba29@gmail.com" "tanemoto@jsk.imi.i.u-tokyo.ac.jp"])
 
-# subprocess.call("echo 本文 | mail -s タイトル -r tanemoto.tba29@gmail.com tanemoto@jsk.imi.i.u-tokyo.ac.jp", shell=True)
-# echo "本文" | mail -s "タイトル" -r tanemoto.tba29@gmail.com tanemoto@jsk.imi.i.u-tokyo.ac.jp
-subprocess.call("echo cat main.txt | mail -s cat title.txt -r tanemoto.tba29@gmail.com tanemoto@jsk.imi.i.u-tokyo.ac.jp")
+def create_message(from_addr, to_addr, bcc_addrs, subject, body):
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = from_addr
+    msg['To'] = to_addr
+    msg['Bcc'] = bcc_addrs
+    msg['Date'] = formatdate()
+    return msg
 
-#roscore
-#v4l2-ctl --list-devicesでデバイスを調べる（これが下の引数になる）
-#rosrun usb_cam usb_cam_node _video_device:=/dev/video4
+
+def send(from_addr, to_addrs, msg):
+    #context = ssl.create_default_context()
+    smtpobj = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
+    smtpobj.login(FROM_ADDRESS, MY_PASSWORD)
+    smtpobj.sendmail(from_addr, to_addrs, msg.as_string())
+    smtpobj.close()
+
+
+def send_mail_main():
+    to_addr = TO_ADDRESS
+    subject = SUBJECT
+    body = BODY
+
+    msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body)
+    send(FROM_ADDRESS, to_addr, msg)
