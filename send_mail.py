@@ -4,12 +4,8 @@ from email.mime.text import MIMEText
 from email.utils import formatdate
 import ssl
 
-FROM_ADDRESS = 'hoge@gmail.com'
+FROM_ADDRESS = 'tanemoto.jsk@gmail.com'
 MY_PASSWORD = 'hogehoge'
-TO_ADDRESS = 'tanemoto@jsk.imi.i.u-tokyo.ac.jp'
-BCC = ''
-SUBJECT = 'GmailのSMTPサーバ経由'
-BODY = 'pythonでメール送信'
 
 
 def create_message(from_addr, to_addr, bcc_addrs, subject, body):
@@ -30,10 +26,16 @@ def send(from_addr, to_addrs, msg):
     smtpobj.close()
 
 
-def send_mail_main():
-    to_addr = TO_ADDRESS
-    subject = SUBJECT
-    body = BODY
+def send_mail_main(num):
+    to_addr = 'tanemoto@jsk.imi.i.u-tokyo.ac.jp'
+    BCC = ''
+    subject = 'LOVOTの状態'
+    if num == 0:
+        body = "LOVOTの充電がしばらく行われていません。ネストに戻れていない可能性があるので73B2付近の方はLOVOTをネストに戻してあげてください。"
+    elif num == 1:
+        body = "LOVOTがネスト付近にいますが充電できていません。ネストとLOVOTの充電端子が接続されているか確かめて下さい。"
+    elif num == 2:
+        body = "LOVOTが充電中です。"
 
     msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body)
     send(FROM_ADDRESS, to_addr, msg)

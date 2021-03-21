@@ -7,6 +7,8 @@ import copy
 import time
 from copy import deepcopy
 
+from send_mail import send_mail_main
+
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import subprocess
@@ -25,20 +27,12 @@ class CheckStatus:
         self.TH = 0.7
         self.status = -1
         self.tm = time.time()
+        self.prev_info = (-1, -1, -1)  # (status, time[s], duration[s])
+        self.flag = False  # メールを送ったかどうか
 
         self.debug_view = rospy.get_param('~debug_view', False)
         
         rospy.Subscriber("/usb_cam/image_raw", Image, self.img_cb)
-
-
-    def send_mail(self, num):
-        if num == 0:
-            subprocess.call("echo LOVOTの充電がしばらく行われていません。ネストに戻れていない可能性があるので73B2付近の方はLOVOTをネストに戻してあげてください。 | mail -s LOVOTの状態 -r tanemoto.tba29@gmail.com tanemoto@jsk.imi.i.u-tokyo.ac.jp", shell=True)
-        elif num == 1:
-            subprocess.call("echo LOVOTがネスト付近にいますが充電できていません。ネストとLOVOTの充電端子が接続されているか確かめて下さい。LOVOTの充電がまだ残っている場合は、ステイモードやお着替えモードになっていないことを確認した上でネスト付近に置き直してあげてください。 | mail -s LOVOTの状態 -r tanemoto.tba29@gmail.com tanemoto@jsk.imi.i.u-tokyo.ac.jp", shell=True)
-        # 確認用
-        elif num == 2:
-            subprocess.call("echo LOVOTが充電中です。 | mail -s LOVOTの状態 -r tanemoto.tba29@gmail.com tanemoto@jsk.imi.i.u-tokyo.ac.jp", shell=True)
 
 
     def search_range(self, input_img):
@@ -88,6 +82,7 @@ class CheckStatus:
         _min_val, max_val_2, _min_loc, max_loc_2 = cv2.minMaxLoc(res2)
         if max_val_2 > self.TH:
             lamp_status = True
+        print(max_val_1, max_val_2)
 
         if self.debug_view:
             H, W, _C = self.horn_img.shape
@@ -115,12 +110,60 @@ class CheckStatus:
 
 
     def img_cb(self, msg):
+        """
+        return integer
+        0 : LOVOTが充電中
+        1 : LOVOTがネスト付近にいるが充電できていない
+        2 : LOVOTは充電中でない
+        3 : LOVOTとネストの接続が切れている
+        """
         self.img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         monitor_img, panel_img = self.search_range(self.img)
         status = self.check_status(monitor_img, panel_img)
+        prev_status, prev_time, duration = self.prev_info
+        cur_time = time.time()
+        if prev_status == status:
+            duration += cur_time - prev_time
+            if not self.flag:
+                if status == 2 and duration > 60 * 50:
+                    send_mail_main(0)
+                    self.flag = True
+                    print("send mail done")
+                elif status == 1 and duration > 60 * 5:
+                    send_mail_main(1)
+                    self.flag = True
+                    print("send mail done")
+                elif status == 0 and duration > 60 * 1:
+                    send_mail_main(2)
+                    self.flag = True
+                    print("send mail done")
+            self.prev_info = (status, cur_time, duration)
+        else:
+            self.prev_info = (status, cur_time, 0)
+            self.flag = False
+        # print(self.prev_info, self.flag)
+
+        rospy.sleep(60)
+
         
 
 if __name__ == '__main__':
     rospy.init_node("LOVOT")
     check = CheckStatus()
     rospy.spin()
+
+"""
+# v4l2-ctl --list-devices
+UCAM-DLE300T: UCAM-DLE300T (usb-0000:06:00.3-3):
+	/dev/video4
+	/dev/video5
+
+Integrated Camera: Integrated C (usb-0000:06:00.4-2.1):
+	/dev/video0
+	/dev/video1
+	/dev/video2
+	/dev/video3
+
+# rosrun usb_cam usb_cam_node _video_device:=/dev/video4
+# python ./check_lovot_status.py _debug_view:=True
+"""
