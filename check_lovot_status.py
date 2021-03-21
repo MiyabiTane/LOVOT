@@ -29,16 +29,22 @@ class CheckStatus:
         self.tm = time.time()
         self.prev_info = (-1, -1, -1)  # (status, time[s], duration[s])
         self.flag = False  # メールを送ったかどうか
+        self.search = False
 
         self.debug_view = rospy.get_param('~debug_view', False)
         
-        rospy.Subscriber("/usb_cam/image_raw", Image, self.img_cb)
+        rospy.Subscriber("/usb_cam/image_raw", Image, self.img_cb, queue_size=1)
 
 
     def search_range(self, input_img):
         H, W, _C = self.nest_img.shape
         res = cv2.matchTemplate(input_img, self.nest_img, cv2.TM_CCOEFF_NORMED)
-        _min_val, _max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
+        _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
+        print(max_val)
+        if max_val < self.TH:
+            self.search = False
+        else:
+            self.search = True
         top_left = max_loc
 
         monitor_lt = (top_left[0] + 5, top_left[1] + H - 10)
@@ -68,7 +74,6 @@ class CheckStatus:
         0 : LOVOTが充電中
         1 : LOVOTがネスト付近にいるが充電できていない
         2 : LOVOTは充電中でない
-        3 : LOVOTとネストの接続が切れている
         """
         horn_status = False
         lamp_status = False
@@ -82,7 +87,7 @@ class CheckStatus:
         _min_val, max_val_2, _min_loc, max_loc_2 = cv2.minMaxLoc(res2)
         if max_val_2 > self.TH:
             lamp_status = True
-        print(max_val_1, max_val_2)
+        # print(max_val_1, max_val_2)
 
         if self.debug_view:
             H, W, _C = self.horn_img.shape
@@ -98,10 +103,7 @@ class CheckStatus:
             cv2.imwrite("debug_lamp.png", monitor_img)
 
         if not horn_status:  # LOVOTが充電場所にいない
-            if not lamp_status:
-                return 2
-            else:
-                return 3
+            return 2
         else:  # LOVOTが充電場所にいる
             if not lamp_status:
                 return 1
@@ -115,36 +117,35 @@ class CheckStatus:
         0 : LOVOTが充電中
         1 : LOVOTがネスト付近にいるが充電できていない
         2 : LOVOTは充電中でない
-        3 : LOVOTとネストの接続が切れている
         """
         self.img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         monitor_img, panel_img = self.search_range(self.img)
-        status = self.check_status(monitor_img, panel_img)
-        prev_status, prev_time, duration = self.prev_info
-        cur_time = time.time()
-        if prev_status == status:
-            duration += cur_time - prev_time
-            if not self.flag:
-                if status == 2 and duration > 60 * 50:
-                    send_mail_main(0)
-                    self.flag = True
-                    print("send mail done")
-                elif status == 1 and duration > 60 * 5:
-                    send_mail_main(1)
-                    self.flag = True
-                    print("send mail done")
-                elif status == 0 and duration > 60 * 1:
-                    send_mail_main(2)
-                    self.flag = True
-                    print("send mail done")
-            self.prev_info = (status, cur_time, duration)
-        else:
-            self.prev_info = (status, cur_time, 0)
-            self.flag = False
-        # print(self.prev_info, self.flag)
+        if self.search:
+            status = self.check_status(monitor_img, panel_img)
+            prev_status, prev_time, duration = self.prev_info
+            cur_time = time.time()
+            if prev_status == status:
+                duration += cur_time - prev_time
+                if not self.flag:
+                    if status == 2 and duration > 60 * 50:
+                        send_mail_main(0)
+                        self.flag = True
+                    elif status == 1 and duration > 60 * 5:
+                        send_mail_main(1)
+                        self.flag = True
+                    """確認用
+                    elif status == 0 and duration > 60 * 1:
+                        send_mail_main(2)
+                        self.flag = True
+                        print("send mail done")
+                    """
+                self.prev_info = (status, cur_time, duration)
+            else:
+                self.prev_info = (status, cur_time, 0)
+                self.flag = False
+            print(self.prev_info, self.flag)
 
-        rospy.sleep(60)
-
+        # rospy.sleep(1)
         
 
 if __name__ == '__main__':
@@ -152,18 +153,3 @@ if __name__ == '__main__':
     check = CheckStatus()
     rospy.spin()
 
-"""
-# v4l2-ctl --list-devices
-UCAM-DLE300T: UCAM-DLE300T (usb-0000:06:00.3-3):
-	/dev/video4
-	/dev/video5
-
-Integrated Camera: Integrated C (usb-0000:06:00.4-2.1):
-	/dev/video0
-	/dev/video1
-	/dev/video2
-	/dev/video3
-
-# rosrun usb_cam usb_cam_node _video_device:=/dev/video4
-# python ./check_lovot_status.py _debug_view:=True
-"""
