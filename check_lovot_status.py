@@ -78,16 +78,24 @@ class CheckStatus:
         """
         horn_status = False
         lamp_status = False
+        check_flag = -2
+        try:
+            res1 = cv2.matchTemplate(panel_img, self.horn_img, cv2.TM_CCOEFF_NORMED)
+            _min_val, max_val_1, _min_loc, max_loc_1 = cv2.minMaxLoc(res1)
+            if max_val_1 > self.TH:
+                horn_status = True
+            check_flag += 1
+        except:
+            pass
 
-        res1 = cv2.matchTemplate(panel_img, self.horn_img, cv2.TM_CCOEFF_NORMED)
-        _min_val, max_val_1, _min_loc, max_loc_1 = cv2.minMaxLoc(res1)
-        if max_val_1 > self.TH:
-            horn_status = True
-
-        res2 = cv2.matchTemplate(monitor_img, self.lamp_img, cv2.TM_CCOEFF_NORMED)
-        _min_val, max_val_2, _min_loc, max_loc_2 = cv2.minMaxLoc(res2)
-        if max_val_2 > self.TH:
-            lamp_status = True
+        try:
+            res2 = cv2.matchTemplate(monitor_img, self.lamp_img, cv2.TM_CCOEFF_NORMED)
+            _min_val, max_val_2, _min_loc, max_loc_2 = cv2.minMaxLoc(res2)
+            if max_val_2 > self.TH:
+                lamp_status = True
+            check_flag += 1
+        except:
+            pass
         # print(max_val_1, max_val_2)
 
         if self.debug_view:
@@ -103,13 +111,14 @@ class CheckStatus:
             cv2.rectangle(monitor_img, top_left, bottom_right, (255, 0, 0), thickness=2, lineType=cv2.LINE_4)
             cv2.imwrite("debug_lamp.png", monitor_img)
 
-        if not horn_status:  # LOVOTが充電場所にいない
-            return 2
-        else:  # LOVOTが充電場所にいる
-            if not lamp_status:
-                return 1
-            else:
-                return 0
+        if check_flag == 0:
+            if not horn_status:  # LOVOTが充電場所にいない
+                return 2
+            else:  # LOVOTが充電場所にいる
+                if not lamp_status:
+                    return 1
+                else:
+                    return 0
 
 
     def img_cb(self, msg):
