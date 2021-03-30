@@ -119,6 +119,8 @@ class CheckStatus:
                     return 1
                 else:
                     return 0
+        else:
+            return -1
 
 
     def img_cb(self, msg):
@@ -133,33 +135,34 @@ class CheckStatus:
         if self.search:
             prev_status, prev_time, duration = self.prev_info
             status = self.check_status(monitor_img, panel_img)
-            cur_time = time.time()
-            if prev_status == status:
-                duration += cur_time - prev_time
-                if duration > 10:
-                    self.keep_info = deepcopy(self.prev_info)
-                if not self.flag:
-                    if status == 2 and duration > 60 * 50:
-                        send_mail_main(0)
-                        self.flag = True
-                    elif status == 1 and duration > 60 * 5:
-                        send_mail_main(1)
-                        self.flag = True
+            if status != -1:
+                cur_time = time.time()
+                if prev_status == status:
+                    duration += cur_time - prev_time
+                    if duration > 10:
+                        self.keep_info = deepcopy(self.prev_info)
+                    if not self.flag:
+                        if status == 2 and duration > 60 * 50:
+                            send_mail_main(0)
+                            self.flag = True
+                        elif status == 1 and duration > 60 * 5:
+                            send_mail_main(1)
+                            self.flag = True
                     
-                    elif status == 0 and duration > 60 * 1:
-                        send_mail_main(2)
-                        self.flag = True
+                        elif status == 0 and duration > 60 * 1:
+                            send_mail_main(2)
+                            self.flag = True
                     
-                self.prev_info = (status, cur_time, duration)
-            else:
-                keep_status, keep_time, keep_duration = self.keep_info
-                self.keep_info = deepcopy(self.prev_info)
-                if duration < 10 and keep_status == status:
-                    self.prev_info = (status, cur_time, keep_duration)
+                    self.prev_info = (status, cur_time, duration)
                 else:
-                    self.prev_info = (status, cur_time, 0)
-                    self.flag = False
-            # print(self.prev_info, self.flag, self.keep_info)
+                    keep_status, keep_time, keep_duration = self.keep_info
+                    self.keep_info = deepcopy(self.prev_info)
+                    if duration < 10 and keep_status == status:
+                        self.prev_info = (status, cur_time, keep_duration)
+                    else:
+                        self.prev_info = (status, cur_time, 0)
+                        self.flag = False
+                print(self.prev_info, self.flag, self.keep_info)
 
         # rospy.sleep(1)
         
