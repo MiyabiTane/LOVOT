@@ -27,9 +27,8 @@ class CheckStatus:
         self.TH = 0.7
         self.status = -1
         self.tm = time.time()
-        self.prev_info = (-1, -1, -1)  # (status, time[s], duration[s])
-        self.keep_info = (-1, -1, -1)
-        self.flag = False  # メールを送ったかどうか
+        self.prev_info = (-1, -1, -1, False)  # (status, time[s], duration[s], send_flag)
+        self.keep_info = (-1, -1, -1, False)
         self.search = False
 
         self.debug_view = rospy.get_param('~debug_view', False)
@@ -123,7 +122,7 @@ class CheckStatus:
         self.img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         monitor_img, panel_img = self.search_range(self.img)
         if self.search:
-            prev_status, prev_time, duration = self.prev_info
+            prev_status, prev_time, duration, send_flag = self.prev_info
             horn_status, lamp_status = self.check_status(monitor_img, panel_img)
             if horn_status == -1 or lamp_status == -1:
                 status = -1
@@ -142,28 +141,27 @@ class CheckStatus:
                     duration += cur_time - prev_time
                     if duration > 10:
                         self.keep_info = deepcopy(self.prev_info)
-                    if not self.flag:
+                    if not send_flag:
                         if status == 0 and duration > 60 * 50:
                             if horn_status == 0:
                                 send_mail_main(0)
                             elif horn_status == 1:
                                 send_mail_main(1)
-                            self.flag = True
+                            send_flag = True
                     
                         elif status == 1 and duration > 10 * 1:
                             send_mail_main(2)
-                            self.flag = True
+                            send_flag = True
                     
-                    self.prev_info = (status, cur_time, duration)
+                    self.prev_info = (status, cur_time, duration, send_flag)
                 else:
-                    keep_status, _keep_time, keep_duration = self.keep_info
+                    keep_status, _keep_time, keep_duration, keep_flag = self.keep_info
                     self.keep_info = deepcopy(self.prev_info)
                     if duration < 10 and keep_status == status:
-                        self.prev_info = (status, cur_time, keep_duration)
+                        self.prev_info = (status, cur_time, keep_duration, keep_flag)
                     else:
-                        self.prev_info = (status, cur_time, 0)
-                        self.flag = False
-                # print(self.prev_info, self.flag, self.keep_info)
+                        self.prev_info = (status, cur_time, 0, False)
+                print(self.prev_info, self.keep_info)
 
         # rospy.sleep(1)
         
