@@ -71,20 +71,20 @@ class CheckStatus:
 
     def check_status(self, monitor_img, panel_img):
         """
-        return integer
-        0 : LOVOTが充電中
-        1 : LOVOTがネスト付近にいるが充電できていない
-        2 : LOVOTは充電中でない
+        return interger, ineteger (horn_status, lamp_status)
+        -1: None
+        0: False
+        1: True 
         """
-        horn_status = False
-        lamp_status = False
-        check_flag = -2
+        horn_status = -1
+        lamp_status = -1
         try:
             res1 = cv2.matchTemplate(panel_img, self.horn_img, cv2.TM_CCOEFF_NORMED)
             _min_val, max_val_1, _min_loc, max_loc_1 = cv2.minMaxLoc(res1)
             if max_val_1 > self.TH:
-                horn_status = True
-            check_flag += 1
+                horn_status = 1
+            else:
+                horn_status = 0
         except:
             pass
 
@@ -92,8 +92,9 @@ class CheckStatus:
             res2 = cv2.matchTemplate(monitor_img, self.lamp_img, cv2.TM_CCOEFF_NORMED)
             _min_val, max_val_2, _min_loc, max_loc_2 = cv2.minMaxLoc(res2)
             if max_val_2 > self.TH:
-                lamp_status = True
-            check_flag += 1
+                lamp_status = 1
+            else:
+                lamp_status = 0
         except:
             pass
         # print(max_val_1, max_val_2)
@@ -111,30 +112,30 @@ class CheckStatus:
             cv2.rectangle(monitor_img, top_left, bottom_right, (255, 0, 0), thickness=2, lineType=cv2.LINE_4)
             cv2.imwrite("debug_lamp.png", monitor_img)
 
-        if check_flag == 0:
-            if not horn_status:  # LOVOTが充電場所にいない
-                return 2
-            else:  # LOVOTが充電場所にいる
-                if not lamp_status:
-                    return 1
-                else:
-                    return 0
-        else:
-            return -1
+        return horn_status, lamp_status
 
 
     def img_cb(self, msg):
         """
-        return integer
-        0 : LOVOTが充電中
-        1 : LOVOTがネスト付近にいるが充電できていない
-        2 : LOVOTは充電中でない
+        (horn_status, lamp_status) = (1, 1) : LOVOTが充電中
+        else : LOVOTは充電中でない
         """
         self.img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         monitor_img, panel_img = self.search_range(self.img)
         if self.search:
             prev_status, prev_time, duration = self.prev_info
-            status = self.check_status(monitor_img, panel_img)
+            horn_status, lamp_status = self.check_status(monitor_img, panel_img)
+            if horn_status == -1 or lamp_status == -1:
+                status = -1
+            elif horn_status == 1 and lamp_status == 1:
+                status = 1
+            else:
+                status = 0
+            """
+            -1: 判定不可（カメラの前に人などが立っている）
+             0: LOVOTが充電中でない
+             1: LOVOTが充電中 
+            """
             if status != -1:
                 cur_time = time.time()
                 if prev_status == status:
@@ -142,27 +143,27 @@ class CheckStatus:
                     if duration > 10:
                         self.keep_info = deepcopy(self.prev_info)
                     if not self.flag:
-                        if status == 2 and duration > 60 * 50:
-                            send_mail_main(0)
-                            self.flag = True
-                        elif status == 1 and duration > 60 * 5:
-                            send_mail_main(1)
+                        if status == 0 and duration > 60 * 50:
+                            if horn_status == 0:
+                                send_mail_main(0)
+                            elif horn_status == 1:
+                                send_mail_main(1)
                             self.flag = True
                     
-                        elif status == 0 and duration > 60 * 1:
+                        elif status == 1 and duration > 10 * 1:
                             send_mail_main(2)
                             self.flag = True
                     
                     self.prev_info = (status, cur_time, duration)
                 else:
-                    keep_status, keep_time, keep_duration = self.keep_info
+                    keep_status, _keep_time, keep_duration = self.keep_info
                     self.keep_info = deepcopy(self.prev_info)
                     if duration < 10 and keep_status == status:
                         self.prev_info = (status, cur_time, keep_duration)
                     else:
                         self.prev_info = (status, cur_time, 0)
                         self.flag = False
-                print(self.prev_info, self.flag, self.keep_info)
+                # print(self.prev_info, self.flag, self.keep_info)
 
         # rospy.sleep(1)
         
