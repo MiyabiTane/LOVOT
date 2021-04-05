@@ -46,17 +46,28 @@ def send(from_addr, to_addrs, msg):
     smtpobj.close()
 
 
-def send_mail_main(num):
+def send_mail_main(num, path):
     to_addr = 'tanemoto@jsk.imi.i.u-tokyo.ac.jp'
     BCC = ''
     subject = 'LOVOTの状態'
-    img_path = "debug.png"
+    img_path = path
     if num == 0:
         body = "LOVOTの充電がしばらく行われていません。ネストに戻れていない可能性があるので73B2付近の方はLOVOTをネストに戻してあげてください。"
     elif num == 1:
         body = "LOVOTがネスト付近にいますが充電できていません。ネストとLOVOTの充電端子が接続されているか確かめて下さい。"
     elif num == 2:
-        body = "LOVOTが充電中です。"
+        body = "おはようございます。今日のLOVOTの様子です。"
+
+    msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body, img_path)
+    send(FROM_ADDRESS, to_addr, msg)
+
+
+def send_mail_debug(path):
+    to_addr = 'tanemoto@jsk.imi.i.u-tokyo.ac.jp'
+    BCC = ''
+    subject = 'デバッグ用＿LOVOTの状態'
+    img_path = path
+    body = "LOVOTが充電中です。"
 
     msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body, img_path)
     send(FROM_ADDRESS, to_addr, msg)
