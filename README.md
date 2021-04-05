@@ -117,3 +117,42 @@ SSHできない場合は以下のコマンドでsshを入れ直してみる。
 $ sudo apt-get --purge remove openssh-server
 $ sudo apt-get install openssh-server
 ```
+
+### SSHしてRaspberry piを動かす
+ariesの鍵をRaspberry piに登録すると同じネットワークになくてもsshできて便利。
+ariesにssh▷raspberry piにssh。この時、```ssh lovotmonitor@[IPアドレス]```として```ifconfig```して調べたアドレスを直接打たないと多分うまくいかない。<br>
+
+ラズパイで動いているプログラムを確認する。
+```
+lovotmonitor@lovotmonitor-desktop:~$ ps a
+```
+例えばターミナルでroscore, usb_cam, check_lovot_status.pyを実行している場合は以下のように出力される。
+```
+  PID TTY      STAT   TIME COMMAND
+ 1001 tty7     Ssl+ 1632:03 /usr/lib/xorg/Xorg -core :0 -seat seat0 -auth /var/r
+ 1004 tty1     Ss+    0:00 /sbin/agetty -o -p -- \u --noclear tty1 linux
+ 2171 pts/1    Ss     0:00 bash
+ 2238 pts/2    Ss     0:00 bash
+ 7737 pts/0    Ss     0:01 bash
+ 9436 pts/2    Sl+   29:14 /usr/bin/python /opt/ros/melodic/bin/roscore
+ 9442 pts/1    Sl+  1393:48 /opt/ros/melodic/lib/usb_cam/usb_cam_node
+ 9486 pts/0    Sl+  4390:06 python ./check_lovot_status.py
+14380 pts/3    Ss     0:00 -bash
+14441 pts/3    R+     0:00 ps a
+```
+
+./check_lovot_status.pyを止めたい場合、```lovotmonitor@lovotmonitor-desktop:~$ kill 9486```すれば良い。
+
+逆にssh先でプロセスを実行し続けたい場合はtmuxを使うのが良い。<br>
+入ってなかったらインストールする。
+```
+lovotmonitor@lovotmonitor-desktop:~$ sudo apt install tmux
+```
+```
+lovotmonitor@lovotmonitor-desktop:~$ tmux
+```
+セッションを開始したらプログラム実行
+```
+$ python ./check_lovot_status.py
+```
+プログラムを実行した状態で[Control + b]でコマンドモードに変更した後\[d]キーでセッションから抜けることができ、sshから抜けてもプログラムを実行した状態にできる。

@@ -4,18 +4,20 @@ import rospy
 import cv2
 import numpy as np
 import copy
-import time
+from datetime import datetime
 from copy import deepcopy
 
-from send_mail import send_mail_main
+from send_mail import send_mail_main, send_mail_debug
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import subprocess
 
+
 LAMP_PATH = "images/lamp.png"
 HORN_PATH = "images/horn.png"
 NEST_PATH = "images/nest.png"
+SAVE_PATH = "images/view.png"
 
 class CheckStatus:
     def __init__(self):
@@ -25,12 +27,14 @@ class CheckStatus:
         self.lamp_img = cv2.imread(LAMP_PATH)
         self.horn_img = cv2.imread(HORN_PATH)
         self.TH = 0.7
-        self.status = -1
-        self.tm = time.time()
-        self.prev_info = (-1, -1, -1, False)  # (status, time[s], duration[s], send_flag)
-        self.keep_info = (-1, -1, -1, False)
-        self.search = False
+        self.status_lst = []  # 0: 充電中でない, 1: 充電中
+        self.info = (datetime.now().hour, datetime.now().minute, -1)  # (statusが変わった時間, status)
+        self.send_flag = False
 
+        self.search = 0  # -1: 夜の充電中, 0: カメラとネストの間に障害物がある, 1: ネストが認識できている
+
+        self.get_up_time = rospy.get_param('~start_time', 11)
+        self.go_bed_time = rospy.get_param('~end_time', 22)
         self.debug_view = rospy.get_param('~debug_view', False)
         
         rospy.Subscriber("/usb_cam/image_raw", Image, self.img_cb, queue_size=1)
@@ -42,9 +46,9 @@ class CheckStatus:
         _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
         # print(max_val)
         if max_val < self.TH:
-            self.search = False
+            self.search = 0
         else:
-            self.search = True
+            self.search = 1
         top_left = max_loc
 
         monitor_lt = (top_left[0] + 5, top_left[1] + H - 10)
@@ -65,7 +69,10 @@ class CheckStatus:
             cv2.rectangle(output_img, panel_lt, panel_rb, (0, 0, 255), thickness=2, lineType=cv2.LINE_4)
             cv2.imwrite("debug.png", output_img)
 
-        return monitor_img, panel_img
+        if self.search == 1:
+            horn_status, lamp_status = self.check_status(monitor_img, panel_img)
+
+        return horn_status, lamp_status
 
 
     def check_status(self, monitor_img, panel_img):
@@ -114,16 +121,31 @@ class CheckStatus:
         return horn_status, lamp_status
 
 
+    def calc(self, cur_hour, cur_minute, prev_hour, prev_minute):
+        if cur_minute < prev_minute:
+            cur_hour -= 1
+            cur_minute += 60
+        diff = (cur_minute - prev_minute) + (cur_hour - prev_hour) * 60
+        print(cur_hour, cur_minute, prev_hour, prev_minute, diff)
+        return diff
+
     def img_cb(self, msg):
         """
         (horn_status, lamp_status) = (1, 1) : LOVOTが充電中
         else : LOVOTは充電中でない
         """
+        cur_time = datetime.now()
+        cur_hour = cur_time.hour
+        cur_minute = cur_time.minute
         self.img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        monitor_img, panel_img = self.search_range(self.img)
-        if self.search:
-            prev_status, prev_time, duration, send_flag = self.prev_info
-            horn_status, lamp_status = self.check_status(monitor_img, panel_img)
+        if self.search == -1 and cur_hour == self.get_up_time:
+            self.search = 0
+            cv2.imwrite(SAVE_PATH, self.img)
+            send_mail_main(2, SAVE_PATH)
+        if cur_hour == self.go_bed_time:
+            self.search = -1
+        if self.search >= 0:
+            horn_status, lamp_status = self.search_range(self.img)
             if horn_status == -1 or lamp_status == -1:
                 status = -1
             elif horn_status == 1 and lamp_status == 1:
@@ -131,43 +153,35 @@ class CheckStatus:
             else:
                 status = 0
             """
-            -1: 判定不可（カメラの前に人などが立っている）
-             0: LOVOTが充電中でない
-             1: LOVOTが充電中 
+            -1: 判定不可
+            0: LOVOTが充電中でない
+            1: LOVOTが充電中
             """
             if status != -1:
-                cur_time = time.time()
-                if prev_status == status:
-                    duration += cur_time - prev_time
-                    if duration > 10:
-                        self.keep_info = deepcopy(self.prev_info)
-                    if not send_flag:
-                        if status == 0 and duration > 60 * 50:
-                            if horn_status == 0:
-                                send_mail_main(0)
-                            elif horn_status == 1:
-                                send_mail_main(1)
-                            send_flag = True
-                    
-                        elif status == 1 and duration > 10 * 1:
-                            send_mail_main(2)
-                            send_flag = True
-                    
-                    self.prev_info = (status, cur_time, duration, send_flag)
-                else:
-                    keep_status, _keep_time, keep_duration, keep_flag = self.keep_info
-                    self.keep_info = deepcopy(self.prev_info)
-                    if duration < 10 and keep_status == status:
-                        self.prev_info = (status, cur_time, keep_duration, keep_flag)
-                    else:
-                        self.prev_info = (status, cur_time, 0, False)
-                print(self.prev_info, self.keep_info)
+                self.status_lst.append(status)
+            if len(self.status_lst) == 60:
+                state_len = len(set(self.status_lst))
+                if state_len == 1:  # ノイズがない情報
+                    keep_hour, keep_minute, keep_status = self.info
+                    if keep_status != status:
+                        self.info = (cur_hour, cur_minute, status)
+                        self.send_flag = False
+                    if keep_status == 0 and status == 1:
+                        cv2.imwrite(SAVE_PATH, self.img)
+                        send_mail_debug(SAVE_PATH)
+                    elif keep_status == 0 and status == 0 and not self.send_flag:
+                        if self.calc(cur_hour, cur_minute, keep_hour, keep_minute) >= 1:  # 1時間以上充電されていない
+                            cv2.imwrite(SAVE_PATH, self.img)
+                            if horn_status:
+                                send_mail_main(1, SAVE_PATH)
+                            else:
+                                send_mail_main(0, SAVE_PATH)
+                            self.send_flag = True
+                self.status_lst = []
+            # print(self.info)
 
-        # rospy.sleep(1)
-        
 
 if __name__ == '__main__':
     rospy.init_node("LOVOT")
     check = CheckStatus()
     rospy.spin()
-
