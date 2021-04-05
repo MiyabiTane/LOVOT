@@ -11,7 +11,6 @@ from send_mail import send_mail_main, send_mail_debug
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-import subprocess
 
 
 LAMP_PATH = "images/lamp.png"
@@ -170,7 +169,7 @@ class CheckStatus:
                         cv2.imwrite(SAVE_PATH, self.img)
                         send_mail_debug(SAVE_PATH)
                     elif keep_status == 0 and status == 0 and not self.send_flag:
-                        if self.calc(cur_hour, cur_minute, keep_hour, keep_minute) >= 1:  # 1時間以上充電されていない
+                        if self.calc(cur_hour, cur_minute, keep_hour, keep_minute) >= 60:  # 1時間以上充電されていない
                             cv2.imwrite(SAVE_PATH, self.img)
                             if horn_status:
                                 send_mail_main(1, SAVE_PATH)

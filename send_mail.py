@@ -69,9 +69,5 @@ def send_mail_debug(path):
     img_path = path
     body = "LOVOTが充電中です。"
 
-<<<<<<< HEAD
-    msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body)
-=======
     msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body, img_path)
->>>>>>> 7bd9faee567966be57ee4734a7a6e3cb63cc68b0
     send(FROM_ADDRESS, to_addr, msg)
