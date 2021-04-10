@@ -145,11 +145,14 @@ class CheckStatus:
             send_mail_main(2, SAVE_PATH)
         if cur_hour == self.go_bed_time and cur_minute == 30:
             self.search = -1
-        if self.search >= 0:
-            # デバッグ用
+        # デバッグ用
+        if self.search != -1:
             if (cur_minute == 0 or cur_minute == 30) and self.debug_mail_flag != cur_minute:
-                send_mail_debug_staus(self.info)
+                cv2.imwrite(SAVE_PATH, self.img)
+                send_mail_debug_staus(self.info, SAVE_PATH)
                 self.debug_mail_flag = cur_minute
+        if self.search >= 0:
+            horn_status, lamp_status = (-1, -1)
             horn_status, lamp_status = self.search_range(self.img)
             if horn_status == -1 or lamp_status == -1:
                 status = -1

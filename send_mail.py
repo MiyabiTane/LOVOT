@@ -12,14 +12,6 @@ import ssl
 FROM_ADDRESS = 'tanemoto.jsk@gmail.com'
 MY_PASSWORD = 'hogehoge'
 
-def create_message_text(from_addr, to_addr, bcc_addrs, subject, body):
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = from_addr
-    msg['To'] = to_addr
-    msg['Bcc'] = bcc_addrs
-    msg['Date'] = formatdate()
-    return msg
 
 def create_message(from_addr, to_addr, bcc_addrs, subject, body, img_path):
     msg = MIMEMultipart()
@@ -81,14 +73,15 @@ def send_mail_debug(path):
     send(FROM_ADDRESS, to_addr, msg)
 
 
-def send_mail_debug_staus(info):
+def send_mail_debug_staus(info, path):
     to_addr = 'tanemoto@jsk.imi.i.u-tokyo.ac.jp'
     BCC = ''
     subject = 'デバッグ用_LOVOTの状態'
+    img_path = path
 
     check_hour, check_minute, status = info
     status_memo = "充電中です。" if status == 1 else "活動中です。"
     body = "LOVOTチェッカーのステータスをお知らせします。" + str(check_hour) + "時" + str(check_minute) + "分から" + status_memo
 
-    msg = create_message_text(FROM_ADDRESS, to_addr, BCC, subject, body)
+    msg = create_message(FROM_ADDRESS, to_addr, BCC, subject, body, img_path)
     send(FROM_ADDRESS, to_addr, msg)
