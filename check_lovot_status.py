@@ -7,7 +7,7 @@ import copy
 from datetime import datetime
 from copy import deepcopy
 
-from send_mail import send_mail_main, send_mail_debug
+from send_mail import send_mail_main, send_mail_debug, send_mail_debug_staus
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -31,6 +31,8 @@ class CheckStatus:
         self.send_flag = False
 
         self.search = 0  # -1: 夜の充電中, 0: カメラとネストの間に障害物がある, 1: ネストが認識できている
+
+        self.debug_mail_flag = -1
 
         self.get_up_time = rospy.get_param('~start_time', 11)
         self.go_bed_time = rospy.get_param('~end_time', 22)
@@ -125,7 +127,7 @@ class CheckStatus:
             cur_hour -= 1
             cur_minute += 60
         diff = (cur_minute - prev_minute) + (cur_hour - prev_hour) * 60
-        print(cur_hour, cur_minute, prev_hour, prev_minute, diff)
+        # print(cur_hour, cur_minute, prev_hour, prev_minute, diff)
         return diff
 
     def img_cb(self, msg):
@@ -141,9 +143,13 @@ class CheckStatus:
             self.search = 0
             cv2.imwrite(SAVE_PATH, self.img)
             send_mail_main(2, SAVE_PATH)
-        if cur_hour == self.go_bed_time:
+        if cur_hour == self.go_bed_time and cur_minute == 30:
             self.search = -1
         if self.search >= 0:
+            # デバッグ用
+            if (cur_minute == 0 or cur_minute == 30) and self.debug_mail_flag != cur_minute:
+                send_mail_debug_staus(self.info)
+                self.debug_mail_flag = cur_minute
             horn_status, lamp_status = self.search_range(self.img)
             if horn_status == -1 or lamp_status == -1:
                 status = -1
