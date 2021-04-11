@@ -72,6 +72,8 @@ class CheckStatus:
 
         if self.search == 1:
             horn_status, lamp_status = self.check_status(monitor_img, panel_img)
+	else:
+            return -1, -1
 
         return horn_status, lamp_status
 
@@ -83,8 +85,6 @@ class CheckStatus:
         0: False
         1: True 
         """
-        horn_status = -1
-        lamp_status = -1
         try:
             res1 = cv2.matchTemplate(panel_img, self.horn_img, cv2.TM_CCOEFF_NORMED)
             _min_val, max_val_1, _min_loc, max_loc_1 = cv2.minMaxLoc(res1)
@@ -93,7 +93,7 @@ class CheckStatus:
             else:
                 horn_status = 0
         except:
-            pass
+            return -1, -1
 
         try:
             res2 = cv2.matchTemplate(monitor_img, self.lamp_img, cv2.TM_CCOEFF_NORMED)
@@ -103,7 +103,7 @@ class CheckStatus:
             else:
                 lamp_status = 0
         except:
-            pass
+            return -1, -1
         # print(max_val_1, max_val_2)
 
         if self.debug_view:
@@ -144,15 +144,17 @@ class CheckStatus:
             cv2.imwrite(SAVE_PATH, self.img)
             send_mail_main(2, SAVE_PATH)
         if cur_hour == self.go_bed_time and cur_minute == 30:
+	    _hour, _minute, status_ = self.info
+	    if status_ != 1:
+		self.info = (cur_hour, cur_minute, 1)
             self.search = -1
         # デバッグ用
-        if self.search != -1:
+	if 11 <= cur_hour <= 22:
             if (cur_minute == 0 or cur_minute == 30) and self.debug_mail_flag != cur_minute:
                 cv2.imwrite(SAVE_PATH, self.img)
                 send_mail_debug_staus(self.info, SAVE_PATH)
                 self.debug_mail_flag = cur_minute
         if self.search >= 0:
-            horn_status, lamp_status = (-1, -1)
             horn_status, lamp_status = self.search_range(self.img)
             if horn_status == -1 or lamp_status == -1:
                 status = -1
@@ -167,7 +169,7 @@ class CheckStatus:
             """
             if status != -1:
                 self.status_lst.append(status)
-            if len(self.status_lst) == 60:
+            if len(self.status_lst) == 30:
                 state_len = len(set(self.status_lst))
                 if state_len == 1:  # ノイズがない情報
                     keep_hour, keep_minute, keep_status = self.info
