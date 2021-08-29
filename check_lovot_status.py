@@ -43,9 +43,11 @@ class CheckStatus:
 
     def search_range(self, input_img):
         H, W, _C = self.nest_img.shape
-        res = cv2.matchTemplate(input_img, self.nest_img, cv2.TM_CCOEFF_NORMED)
-        _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
-        # print(max_val)
+	try:
+	    res = cv2.matchTemplate(input_img, self.nest_img, cv2.TM_CCOEFF_NORMED)
+	    _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
+        except:
+            return -1, -1
         if max_val < self.TH:
             self.search = 0
         else:
@@ -180,7 +182,7 @@ class CheckStatus:
                         cv2.imwrite(SAVE_PATH, self.img)
                         send_mail_debug(SAVE_PATH)
                     elif keep_status == 0 and status == 0 and not self.send_flag:
-                        if self.calc(cur_hour, cur_minute, keep_hour, keep_minute) >= 60:  # 1時間以上充電されていない
+                        if self.calc(cur_hour, cur_minute, keep_hour, keep_minute) >= 75:  # 75分以上充電されていない
                             cv2.imwrite(SAVE_PATH, self.img)
                             if horn_status:
                                 send_mail_main(1, SAVE_PATH)
