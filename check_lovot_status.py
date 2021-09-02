@@ -43,11 +43,9 @@ class CheckStatus:
 
     def search_range(self, input_img):
         H, W, _C = self.nest_img.shape
-	try:
-	    res = cv2.matchTemplate(input_img, self.nest_img, cv2.TM_CCOEFF_NORMED)
-	    _min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
-        except:
-            return -1, -1
+	max_loc = -1
+	res = cv2.matchTemplate(input_img, self.nest_img, cv2.TM_CCOEFF_NORMED)
+	_min_val, max_val, _min_loc, max_loc = cv2.minMaxLoc(res)
         if max_val < self.TH:
             self.search = 0
         else:
@@ -87,24 +85,28 @@ class CheckStatus:
         0: False
         1: True 
         """
-        try:
+	h1, w1, _ = panel_img.shape
+	h2, w2, _ = self.horn_img.shape 
+	if h1 >= h2 and w1 >= w2:
             res1 = cv2.matchTemplate(panel_img, self.horn_img, cv2.TM_CCOEFF_NORMED)
             _min_val, max_val_1, _min_loc, max_loc_1 = cv2.minMaxLoc(res1)
             if max_val_1 > self.TH:
                 horn_status = 1
             else:
                 horn_status = 0
-        except:
+	else:
             return -1, -1
 
-        try:
+	h1, w1, _ = monitor_img.shape
+	h2, w2, _ = self.lamp_img.shape
+	if h1 >= h2 and w1 >= w2:
             res2 = cv2.matchTemplate(monitor_img, self.lamp_img, cv2.TM_CCOEFF_NORMED)
             _min_val, max_val_2, _min_loc, max_loc_2 = cv2.minMaxLoc(res2)
             if max_val_2 > self.TH:
                 lamp_status = 1
             else:
                 lamp_status = 0
-        except:
+        else:
             return -1, -1
         # print(max_val_1, max_val_2)
 
