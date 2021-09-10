@@ -8,7 +8,8 @@ import copy
 from datetime import datetime
 from copy import deepcopy
 
-from send_mail import send_mail_main, send_mail_debug, send_mail_debug_staus
+from send_mail import SEND_MAIL
+from yaml_util import load_yaminfo
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -21,6 +22,7 @@ LAMP_PATH = "{}/images/lamp.png".format(PACKAGE_PATH)
 HORN_PATH = "{}/images/horn.png".format(PACKAGE_PATH)
 NEST_PATH = "{}/images/nest.png".format(PACKAGE_PATH)
 SAVE_PATH = "{}/images/view.png".format(PACKAGE_PATH)
+YAML_PATH = "{}/info.yaml".format(PACKAGE_PATH)
 
 class CheckStatus:
     def __init__(self):
@@ -41,6 +43,10 @@ class CheckStatus:
         self.get_up_time = rospy.get_param('~start_time', 11)
         self.go_bed_time = rospy.get_param('~end_time', 22)
         self.debug_view = rospy.get_param('~debug_view', False)
+        yaml_path = rospy.get_param('~yaml_path', YAML_PATH)
+        from_addr, to_addr_p, to_addr_o, password = load_yaminfo(yaml_path)
+        self.sender = SEND_MAIL(from_addr, password, to_addr_p, to_addr_o)
+
         
         rospy.Subscriber("/usb_cam/image_raw", Image, self.img_cb, queue_size=1)
 
@@ -150,7 +156,7 @@ class CheckStatus:
         if self.search == -1 and cur_hour == self.get_up_time:
             self.search = 0
             cv2.imwrite(SAVE_PATH, self.img)
-            send_mail_main(2, SAVE_PATH)
+            self.sender.send_mail_main(2, SAVE_PATH)
         if cur_hour == self.go_bed_time and cur_minute == 30:
 	    _hour, _minute, status_ = self.info
 	    if status_ != 1:
@@ -160,7 +166,7 @@ class CheckStatus:
 	if 11 <= cur_hour <= 22:
             if (cur_minute == 0 or cur_minute == 30) and self.debug_mail_flag != cur_minute:
                 cv2.imwrite(SAVE_PATH, self.img)
-                send_mail_debug_staus(self.info, SAVE_PATH)
+                self.sender.send_mail_debug_staus(self.info, SAVE_PATH)
                 self.debug_mail_flag = cur_minute
         if self.search >= 0:
             horn_status, lamp_status = self.search_range(self.img)
@@ -186,14 +192,14 @@ class CheckStatus:
                         self.send_flag = False
                     if keep_status == 0 and status == 1:
                         cv2.imwrite(SAVE_PATH, self.img)
-                        send_mail_debug(SAVE_PATH)
+                        self.sender.send_mail_debug(SAVE_PATH)
                     elif keep_status == 0 and status == 0 and not self.send_flag:
                         if self.calc(cur_hour, cur_minute, keep_hour, keep_minute) >= 75:  # 75分以上充電されていない
                             cv2.imwrite(SAVE_PATH, self.img)
                             if horn_status:
-                                send_mail_main(1, SAVE_PATH)
+                                self.sender.send_mail_main(1, SAVE_PATH)
                             else:
-                                send_mail_main(0, SAVE_PATH)
+                                self.sender.send_mail_main(0, SAVE_PATH)
                             self.send_flag = True
                 self.status_lst = []
             # print(self.info)
