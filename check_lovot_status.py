@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import rospkg
 import rospy
 import cv2
 import numpy as np
@@ -13,10 +14,13 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 
-LAMP_PATH = "images/lamp.png"
-HORN_PATH = "images/horn.png"
-NEST_PATH = "images/nest.png"
-SAVE_PATH = "images/view.png"
+rpack = rospkg.RosPack()
+PACKAGE_PATH = rpack.get_path('lovot_monitor')
+
+LAMP_PATH = "{}/images/lamp.png".format(PACKAGE_PATH)
+HORN_PATH = "{}/images/horn.png".format(PACKAGE_PATH)
+NEST_PATH = "{}/images/nest.png".format(PACKAGE_PATH)
+SAVE_PATH = "{}/images/view.png".format(PACKAGE_PATH)
 
 class CheckStatus:
     def __init__(self):
