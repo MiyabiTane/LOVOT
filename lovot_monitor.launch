@@ -1,0 +1,11 @@
+<launch>
+
+  <node name="usb_cam" pkg="usb_cam" type="usb_cam_node">
+    <rosparam>
+      video_device: /dev/video0
+    </rosparam>
+  </node>
+
+  <node name="check_lovot_status" pkg="lovot_monitor" type="check_lovot_status.py"
+        output="screen" respawn="true" />
+</launch>
