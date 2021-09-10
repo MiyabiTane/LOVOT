@@ -28,6 +28,40 @@ Integrated Camera: Integrated C (usb-0000:06:00.4-2.1):
 ```
 上の例では`_video_device:=/dev/video4`または`_video_device:=/dev/video5`とすることでUSBカメラを指定することができます。
 
+## PCを毎日再起動し、プログラムを実行し直すようにする（エラーで止まるのを防ぐため）
+
+### crontab
+
+毎日同じ時間に特定のコマンドを実行することができる
+
+以下のコマンドで中身を閲覧できる
+```
+$ sudo crontab -l
+```
+
+今回は毎日22時にPCを再起動したいので
+```
+$ sudo crontab -e
+```
+
+して以下の内容を最終行に付け足す
+```
+$ 0 22 * * * /sbin/shutdown -r now 
+```
+
+### systemctl(systemd)
+
+PCが起動した際に走るプログラム
+
+```lovot-monitor.service```を```/etc/systemd/system```にコピーして使う
+
+```
+$ sudo cp ./systemed/* /etc/systemd/system
+$ sudo systemctl daemon-reload
+# enable your service
+$ sudo systemctl enable jsk-pr1040-influxdb.service
+```
+
 
 ## Raspbrry pi3にUbuntu18をいれてセットアップするまで
 
