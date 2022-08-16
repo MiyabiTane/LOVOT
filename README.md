@@ -190,6 +190,8 @@ $ python ./check_lovot_status.py
 
 ### ラズパイで固定IP設定
 
+※追記：この方法でIPを固定するとGmail送信ができなくなってしまうため、固定IP設定はGUIから行ったほうが良い。また、ariesを挟まなければラズパイのホストネームでsshできるはず。
+
 `/etc/netplan/99_config.yaml`を以下のように書き換える。なければ作成する。
 ```
 network:
