@@ -4,9 +4,9 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=lovotmonitor
-Group=lovotmonitor
-ExecStart=/bin/bash -c "source /home/lovotmonitor/ros/melodic/devel/setup.bash && roslaunch lovot_monitor lovot_monitor.launch"
+User=hoge
+Group=hoge
+ExecStart=/bin/bash -c "source ${HOME}/lovot_ws/devel/setup.bash && roslaunch lovot_monitor lovot_monitor.launch"
 
 [Install]
 WantedBy=multi-user.target

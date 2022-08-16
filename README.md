@@ -2,35 +2,53 @@
 Raspberry piにUSBカメラを接続し、ネスト付近の動画を常に撮影できるようにします。LOVOTが一定時間充電されていない場合には研究室全体にその旨をメールします。
 
 ## 使い方
-Raspberry pi上で、それぞれ別のターミナルで
-```
-$ roscore
-$ rosrun usb_cam usb_cam_node
-$ python ./check_lovot_status.py (_debug_view:=True)
-```
-_debug_view:=Trueにするとテンプレートマッチングの結果を可視化することができます。<br>
-また、PCで実行するなど、USBカメラ以外のカメラが存在する場合は
-```
-$ rosrun usb_cam usb_cam_node _video_device:=/dev/video4
-```
-のようにUSBカメラを引数に設定します。USBカメラのパスは以下のようにして調べることができます。
-```
-$ v4l2-ctl --list-devices
-UCAM-DLE300T: UCAM-DLE300T (usb-0000:06:00.3-3):
-	/dev/video4
-	/dev/video5
 
-Integrated Camera: Integrated C (usb-0000:06:00.4-2.1):
-	/dev/video0
-	/dev/video1
-	/dev/video2
-	/dev/video3
+### 本ディレクトリのクローンとビルド
+
 ```
-上の例では`_video_device:=/dev/video4`または`_video_device:=/dev/video5`とすることでUSBカメラを指定することができます。
+$ mkdir -p lovot_ws/src
+$ cd lovot_ws/src
+$ git clone https://github.com/MiyabiTane/LOVOT.git
+$ cd ../  # lovot_ws
+$ catkin build lovot_monitor
+```
 
-## PCを毎日再起動し、プログラムを実行し直すようにする（エラーで止まるのを防ぐため）
+### yamlファイルの書き換え
 
-### crontab
+まず、送信に用いるメールアドレスのアプリパスワードを設定する必要がある
+Googleアカウント設定ページの`セキュリティ`から
+1. ２段階認証プロセスを設定
+2. アプリパスワードを設定
+	セキュリティ画面に戻って、`アプリパスワード`▷`アプリを選択`▷`その他(名前を入力)`で任意の名前を打ち込む
+3. `生成`をクリックし、作成された16文字の文字列`<Gmail_pass>`を記録する。これ以降見れなくなるので注意する
+
+次に、`info.yaml`を書き換える
+```
+SENDOR_ADDR: メール送信に用いるアドレス
+RECIPIENT_ADDR_O: 状態メールを送信するアドレス
+RECIPIENT_ADDR_P: デバッグメールを送信するアドレス
+PASSWORD: 先程作成したアプリパスワード<Gmail_pass>
+```
+
+### systemctl(systemd)の設定
+
+PCが起動した際に走るプログラム
+
+まず、`systemd/lovot-monitor.service`の`User`,`Group`をそのPCのユーザー名に変更する。ユーザー名はターミナルを開いた時の@より前の文字列。
+```
+$ vi systemd/lovot-monitor.service
+```
+書き換えが完了したら`systemd/lovot-monitor.service`を`/etc/systemd/system`にコピーして使う
+
+```
+$ sudo cp ./systemed/* /etc/systemd/system
+$ sudo cp systemd/lovot-monitor.service /etc/systemd/system/lovot-monitor.service
+$ sudo systemctl daemon-reload
+# enable your service
+$ sudo systemctl enable lovot-monitor.service
+```
+
+### crontabの設定
 
 毎日同じ時間に特定のコマンドを実行することができる
 
@@ -48,20 +66,6 @@ $ sudo crontab -e
 ```
 $ 0 22 * * * /sbin/shutdown -r now 
 ```
-
-### systemctl(systemd)
-
-PCが起動した際に走るプログラム
-
-```lovot-monitor.service```を```/etc/systemd/system```にコピーして使う
-
-```
-$ sudo cp ./systemed/* /etc/systemd/system
-$ sudo systemctl daemon-reload
-# enable your service
-$ sudo systemctl enable jsk-pr1040-influxdb.service
-```
-
 
 ## Raspbrry pi3にUbuntu18をいれてセットアップするまで
 
@@ -145,13 +149,6 @@ tork@ubuntu:~/$ ssh lovotmonitor@lovotmonitor-desktop.local
 ```
 これでSSHできるはず
 
-### トラブルシューティング
-SSHできない場合は以下のコマンドでsshを入れ直してみる。
-```
-$ sudo apt-get --purge remove openssh-server
-$ sudo apt-get install openssh-server
-```
-
 ### SSHしてRaspberry piを動かす
 ariesの鍵をRaspberry piに登録すると同じネットワークになくてもsshできて便利。
 ariesにssh▷raspberry piにssh。この時、```ssh lovotmonitor@[IPアドレス]```として```ifconfig```して調べたアドレスを直接打たないと多分うまくいかない。<br>
@@ -190,3 +187,73 @@ lovotmonitor@lovotmonitor-desktop:~$ tmux
 $ python ./check_lovot_status.py
 ```
 プログラムを実行した状態で[Control + b]でコマンドモードに変更した後\[d]キーでセッションから抜けることができ、sshから抜けてもプログラムを実行した状態にできる。
+
+### ラズパイで固定IP設定
+
+`/etc/netplan/99_config.yaml`を以下のように書き換える。なければ作成する。
+```
+network:
+  ethernets:
+    eth0:
+      dhcp4: false
+      dhcp6: false
+      addresses: [192.168.xx.xx/24]
+      gateway4: 192.168.xx.x
+
+  wifis:
+    wlan0:
+      dhcp4: false
+      dhcp6: false
+      addresses: [192.168.xx.xx/24]
+      gateway4: 192.168.xx.x
+      access-points:
+        "ホスト名":
+         password: "hogehoge"
+      nameservers:
+        addresses: [192.168.xx.x, 8.8.8.8, 8.8.4.4]
+  version: 2
+  renderer: networkd
+```
+
+## トラブルシューティング
+
+### SSHができない
+
+SSHできない場合は以下のコマンドでsshを入れ直してみる。
+```
+$ sudo apt-get --purge remove openssh-server
+$ sudo apt-get install openssh-server
+```
+
+### USBカメラが起動しない
+
+USBカメラが正しく認識されない場合（PCで実行するなど、USBカメラ以外のカメラが存在する場合）は`_video_device`引数を指定する。
+```
+$ rosrun usb_cam usb_cam_node _video_device:=/dev/video4
+```
+のようにUSBカメラを引数に設定します。USBカメラのパスは以下のようにして調べることができます。
+```
+$ v4l2-ctl --list-devices
+UCAM-DLE300T: UCAM-DLE300T (usb-0000:06:00.3-3):
+	/dev/video4
+	/dev/video5
+
+Integrated Camera: Integrated C (usb-0000:06:00.4-2.1):
+	/dev/video0
+	/dev/video1
+	/dev/video2
+	/dev/video3
+```
+上の例では`_video_device:=/dev/video4`または`_video_device:=/dev/video5`とすることでUSBカメラを指定することができます。
+
+### LOVOTの状態認識が頻繁に失敗する
+
+LOVOT監視がうまく行っていない場合は、`_debug_view`引数を指定することでテンプレートマッチングの結果を可視化することができます。
+```
+$ python ./check_lovot_status.py _debug_view:=True
+```
+カメラの画角も確認してみること
+
+## 参考記事
+[ラズパイ: Ubuntuのセットアップ](https://taku-info.com/piubuntu_setup/)<br>
+[Python: Gmail × 2段階認証](https://yuki.world/python-send-gmail-with-app-password/)
